@@ -9,6 +9,9 @@ import (
 	"fmt"
 	"net/http"
 
+	"eats/backend/common"
+	"eats/backend/common/shared"
+
 	"github.com/labstack/echo/v4"
 	strictecho "github.com/oapi-codegen/runtime/strictmiddleware/echo"
 	openapi_types "github.com/oapi-codegen/runtime/types"
@@ -33,10 +36,10 @@ type Address struct {
 }
 
 // CountryCode Country code in ISO 3166-1 alpha-2 format
-type CountryCode = string
+type CountryCode = shared.CountryCode
 
 // CustomerUUID UUID of a customer
-type CustomerUUID = openapi_types.UUID
+type CustomerUUID = common.UUID
 
 // ErrorDetails defines model for ErrorDetails.
 type ErrorDetails struct {

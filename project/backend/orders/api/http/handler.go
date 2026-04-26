@@ -4,8 +4,6 @@ import (
 	"context"
 
 	"eats/backend/common"
-
-	"github.com/google/uuid"
 )
 
 type Handler struct{}
@@ -24,6 +22,6 @@ func (h *Handler) RegisterCustomer(
 	request RegisterCustomerRequestObject,
 ) (RegisterCustomerResponseObject, error) {
 	return RegisterCustomer201JSONResponse{
-		CustomerUuid: uuid.New(),
+		CustomerUuid: common.NewUUIDv7(),
 	}, nil
 }
