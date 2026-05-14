@@ -168,7 +168,7 @@ import "eats/backend/common"
 import "eats/backend/common/shared"
 
 type CountryCode = shared.CountryCode  // Only valid country codes accepted
-type CustomerUUID = common.UUID        // Distinct type — won't mix with OrderUUID
+type CustomerUUID = common.UUID        // Alias — same type as common.UUID; NOT distinct from OrderUUID if it's also = common.UUID
 ```
 
 #### e) Execution / Internal Walkthrough
@@ -1272,7 +1272,12 @@ type CustomerUUID = common.UUID   // Alias — CustomerUUID IS common.UUID
 type OrderUUID    = common.UUID   // Also an alias — OrderUUID IS ALSO common.UUID
 
 var c CustomerUUID = common.NewUUIDv7()
-var o OrderUUID    = c   // Compiles! Both are common.UUID aliases
+var o OrderUUID    = c   // ⚠️ Compiles! Both are common.UUID — NO protection between them
+
+// For real compile-time protection, use named types (no =):
+type CustomerUUID common.UUID   // NEW distinct type
+type OrderUUID    common.UUID   // ANOTHER distinct type
+var o2 OrderUUID  = OrderUUID(c) // explicit conversion required — compiler enforces distinction
 ```
 Don't Confuse With: Named type (`type UUID [16]byte` without `=`) — a named type creates a NEW distinct type. An alias (`=`) is just a second name for the same type. Aliases are interchangeable; named types are not.
 
