@@ -1,6 +1,0 @@
-exercise_id = "2796addb-6895-4960-ab62-f01a619b94aa"
-directory = "project"
-is_text_only = false
-is_optional = false
-module_name = "04-database"
-exercise_name = "02-generate-sqlc"
