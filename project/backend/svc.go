@@ -11,6 +11,7 @@ import (
 	echo "github.com/labstack/echo/v4"
 
 	commonHTTP "eats/backend/common/http"
+	"eats/backend/common/log"
 	"eats/backend/common/module"
 	"eats/backend/common/module/contracts"
 	"eats/backend/orders"
@@ -39,6 +40,8 @@ func New(
 	}
 
 	for _, module := range modules {
+		start := time.Now()
+
 		if err := module.Init(ctx); err != nil {
 			return Svc{}, fmt.Errorf("initializing module %s failed: %w", module.Name(), err)
 		}
@@ -46,6 +49,11 @@ func New(
 		if err := module.RegisterContracts(ctx, moduleContracts); err != nil {
 			return Svc{}, fmt.Errorf("registering module %s failed: %w", module.Name(), err)
 		}
+
+		log.FromContext(ctx).With(
+			"duration", time.Since(start),
+			"module", module.Name(),
+		).Debug("Initialized module")
 	}
 
 	if err := moduleContracts.Verify(); err != nil {
@@ -72,7 +80,10 @@ func (s *Svc) Run(ctx context.Context, port string) error {
 	go func() {
 		<-ctx.Done()
 
-		_ = s.echoRouter.Shutdown(context.Background())
+		err := s.echoRouter.Shutdown(context.Background())
+		if err != nil {
+			log.FromContext(ctx).Error("shutting down http server failed")
+		}
 	}()
 
 	s.echoRouter.Server.WriteTimeout = 15 * time.Second
