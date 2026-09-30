@@ -4,8 +4,6 @@ import (
 	"context"
 
 	"eats/backend/common"
-
-	"github.com/google/uuid"
 )
 
 type Handler struct{}
@@ -34,9 +32,8 @@ func NewHandler() Handler {
 // So: Echo only ever talks to ServerInterface. We only ever write
 // StrictServerInterface. NewStrictHandler is the adapter in between.
 
-
 func (h *Handler) RegisterCustomer(ctx context.Context, request RegisterCustomerRequestObject) (RegisterCustomerResponseObject, error) {
-	uuid := uuid.New()
+	uuid := common.NewUUIDv7()
 	return RegisterCustomer201JSONResponse{
 		CustomerUuid: uuid,
 	}, nil

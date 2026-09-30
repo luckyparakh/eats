@@ -79,6 +79,9 @@ components:
       type: string
       format: uuid
       description: UUID of a customer
+      x-go-type: common.UUID
+      x-go-type-import: 
+        path: eats/backend/common
 
     Address:
       type: object
@@ -107,6 +110,9 @@ components:
     CountryCode:
       type: string
       description: Country code in ISO 3166-1 alpha-2 format
+      x-go-type: shared.CountryCode
+      x-go-type-import: 
+        path: eats/backend/common/shared
 
     ErrorResponse:
       type: object
