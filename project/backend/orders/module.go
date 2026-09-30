@@ -2,6 +2,7 @@ package orders
 
 import (
 	"context"
+	"embed"
 
 	"github.com/jackc/pgx/v5/pgxpool"
 
@@ -30,9 +31,22 @@ func (m *Module) Name() module.Name {
 	return "orders"
 }
 
+//go:embed adapters/db/migrations/*.sql
+var embedMigrations embed.FS
+
 func (m *Module) Init(ctx context.Context) error {
 	httpHandler := http2.NewHandler()
 	m.httpHandler = httpHandler
+
+	if err := common.MigrateDatabaseUp(
+		ctx,
+		string(m.Name()),
+		m.pgxDb,
+		embedMigrations,
+		"adapters/db/migrations",
+	); err != nil {
+		return err
+	}
 
 	return nil
 }
