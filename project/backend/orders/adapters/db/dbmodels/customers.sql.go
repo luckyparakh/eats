@@ -13,7 +13,12 @@ import (
 )
 
 const getCustomerByUUID = `-- name: GetCustomerByUUID :one
-SELECT customer_uuid, name, email, address, phone_number FROM orders.customers where customer_uuid = $1
+SELECT
+	customer_uuid, name, email, address, phone_number
+FROM
+	orders.customers
+WHERE
+	customer_uuid = $1
 `
 
 func (q *Queries) GetCustomerByUUID(ctx context.Context, customerUuid common.UUID) (OrdersCustomer, error) {
@@ -30,7 +35,15 @@ func (q *Queries) GetCustomerByUUID(ctx context.Context, customerUuid common.UUI
 }
 
 const insertCustomer = `-- name: InsertCustomer :exec
-INSERT INTO orders.customers (customer_uuid, name, email, address, phone_number) values ($1,$2,$3,$4,$5)
+INSERT INTO
+	orders.customers (
+	customer_uuid,
+	name,
+	email,
+	address,
+	phone_number)
+VALUES
+	($1, $2, $3, $4, $5)
 `
 
 type InsertCustomerParams struct {

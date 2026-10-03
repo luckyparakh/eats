@@ -35,7 +35,9 @@ func (m *Module) Name() module.Name {
 var embedMigrations embed.FS
 
 func (m *Module) Init(ctx context.Context) error {
-	httpHandler := http2.NewHandler(m.pgxDb)
+	httpHandler := http2.NewHandler(
+		m.pgxDb,
+	)
 	m.httpHandler = httpHandler
 
 	if err := common.MigrateDatabaseUp(
