@@ -9,10 +9,18 @@ import (
 	"eats/backend/common"
 	"eats/backend/common/module"
 	"eats/backend/common/module/contracts"
+	"eats/backend/orders/adapters/db"
 	http2 "eats/backend/orders/api/http"
 	ordersModule "eats/backend/orders/api/module"
 )
 
+// Module is the composition root for the orders module: it wires this module's own
+// adapters, handlers, and dependencies together. It is not the app's entry point
+// (see backend/cmd/main.go) — the framework calls into Name/Init/RegisterContracts/
+// RegisterHttp. Because it sits above the module's sub-packages, it's the one place
+// allowed to import across them freely; e.g. it imports both http and db to inject the
+// db-based repository into the http handler, which individual sub-packages must not do
+// directly (http importing db would create the cyclic import the repository pattern avoids).
 type Module struct {
 	pgxDb       *pgxpool.Pool
 	httpHandler http2.Handler
@@ -35,8 +43,9 @@ func (m *Module) Name() module.Name {
 var embedMigrations embed.FS
 
 func (m *Module) Init(ctx context.Context) error {
+	cr := db.NewCustomerRepository(m.pgxDb)
 	httpHandler := http2.NewHandler(
-		m.pgxDb,
+		cr,
 	)
 	m.httpHandler = httpHandler
 
