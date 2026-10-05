@@ -6,6 +6,8 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 
 	"eats/backend/common"
+	"eats/backend/common/shared"
+	"eats/backend/orders/adapters/db/dbmodels"
 	"eats/backend/orders/api/http"
 )
 
@@ -24,6 +26,30 @@ func NewCustomerRepository(db *pgxpool.Pool) *CustomerRepository {
 }
 
 func (r *CustomerRepository) RegisterCustomer(ctx context.Context, customerUUID common.UUID, customer http.RegisterCustomer) error {
-	// TODO: implement me
+	queries := dbmodels.New(r.db)
+
+	address, err := addressfromOpenAPIToShared(customer.Address)
+	if err != nil {
+		return err
+	}
+
+	args := dbmodels.InsertCustomerParams{
+		CustomerUuid: customerUUID,
+		Name:         customer.Name,
+		Email:        string(customer.Email),
+		Address:      address,
+		PhoneNumber: customer.PhoneNumber,
+	}
+	queries.InsertCustomer(ctx, args)
 	return nil
+}
+
+func addressfromOpenAPIToShared(addr http.Address) (shared.Address, error) {
+	return shared.NewAddress(
+		addr.Line1,
+		addr.Line2,
+		addr.PostalCode,
+		addr.City,
+		addr.CountryCode,
+	)
 }
