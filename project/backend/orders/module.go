@@ -12,6 +12,7 @@ import (
 	"eats/backend/orders/adapters/db"
 	http2 "eats/backend/orders/api/http"
 	ordersModule "eats/backend/orders/api/module"
+	"eats/backend/orders/app"
 )
 
 // Module is the composition root for the orders module: it wires this module's own
@@ -43,10 +44,7 @@ func (m *Module) Name() module.Name {
 var embedMigrations embed.FS
 
 func (m *Module) Init(ctx context.Context) error {
-	cr := db.NewCustomerRepository(m.pgxDb)
-	httpHandler := http2.NewHandler(
-		cr,
-	)
+	httpHandler := http2.NewHandler()
 	m.httpHandler = httpHandler
 
 	if err := common.MigrateDatabaseUp(
