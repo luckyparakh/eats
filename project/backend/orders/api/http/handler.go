@@ -28,7 +28,7 @@ func (h Handler) RegisterCustomer(ctx context.Context, request RegisterCustomerR
 	}
 
 	customerApp := app.Customer{
-		CustomerUUID: customerUUID,
+		CustomerUUID: app.CustomerUUID{UUID: customerUUID},
 		Name:         customer.Name,
 		Email:        string(customer.Email),
 		PhoneNumber:  customer.PhoneNumber,
@@ -40,7 +40,7 @@ func (h Handler) RegisterCustomer(ctx context.Context, request RegisterCustomerR
 	}
 
 	return RegisterCustomer201JSONResponse{
-		CustomerUuid: customerUUID,
+		CustomerUuid: app.CustomerUUID{UUID: customerUUID},
 	}, nil
 }
 

@@ -28,14 +28,14 @@ sql:
           - db_type: "uuid"
             nullable: false
             go_type:
-              import: "eats/backend/common"
-              type: "UUID"
+              import: "eats/backend/orders/app"
+              type: "CustomerUUID"
 
           - db_type: "uuid"
             nullable: true
             go_type:
-              import: "eats/backend/common"
-              type: "NullUUID"
+              import: "eats/backend/orders/app"
+              type: "NullCustomerUUID"
 
           - column: "orders.customers.address"
             go_type:
