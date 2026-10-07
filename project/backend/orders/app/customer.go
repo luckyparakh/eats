@@ -7,8 +7,12 @@ import (
 	"eats/backend/common/shared"
 )
 
+type CustomerUUID struct {
+	common.UUID
+}
+
 type Customer struct {
-	CustomerUUID common.UUID
+	CustomerUUID CustomerUUID
 	Name         string
 	Email        string
 	Address      shared.Address
