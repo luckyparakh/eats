@@ -4,22 +4,17 @@ import (
 	"context"
 
 	"eats/backend/common"
+	"eats/backend/common/shared"
+	"eats/backend/orders/app"
 )
 
-type CustomerRepository interface {
-	RegisterCustomer(ctx context.Context, customerUUID common.UUID, customer RegisterCustomer) error
-}
-
 type Handler struct {
-	customerRepository CustomerRepository
+	svc *app.Service
 }
 
-func NewHandler(cr CustomerRepository) Handler {
-	if cr == nil {
-		panic("CustomerRepository can't be nil")
-	}
+func NewHandler(svc *app.Service) Handler {
 	return Handler{
-		customerRepository: cr,
+		svc: svc,
 	}
 }
 
@@ -27,7 +22,20 @@ func (h Handler) RegisterCustomer(ctx context.Context, request RegisterCustomerR
 	customer := request.Body
 	customerUUID := common.NewUUIDv7()
 
-	if err := h.customerRepository.RegisterCustomer(ctx, customerUUID, *customer); err != nil {
+	address, err := addressfromOpenAPIToShared(customer.Address)
+	if err != nil {
+		return nil, err
+	}
+
+	customerApp := app.Customer{
+		CustomerUUID: customerUUID,
+		Name:         customer.Name,
+		Email:        string(customer.Email),
+		PhoneNumber:  customer.PhoneNumber,
+		Address:      address,
+	}
+
+	if err := h.svc.RegisterCustomer(ctx, customerApp); err != nil {
 		return nil, err
 	}
 
@@ -40,4 +48,14 @@ func Register(ctx context.Context, e EchoRouter, handler Handler) error {
 	RegisterHandlers(e, NewStrictHandler(handler, nil))
 
 	return nil
+}
+
+func addressfromOpenAPIToShared(addr Address) (shared.Address, error) {
+	return shared.NewAddress(
+		addr.Line1,
+		addr.Line2,
+		addr.PostalCode,
+		addr.City,
+		addr.CountryCode,
+	)
 }
