@@ -16,7 +16,7 @@ func NewEcho() *echo.Echo {
 	e.HideBanner = true
 
 	useMiddlewares(e)
-	e.HTTPErrorHandler = HandleError
+	e.HTTPErrorHandler = common.EchoErrorHandler
 	e.Logger = common.NewEchoSlogAdapter(slog.Default())
 
 	e.GET("/health", func(c echo.Context) error {
