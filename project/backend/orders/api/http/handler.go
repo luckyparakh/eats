@@ -24,7 +24,7 @@ func (h Handler) RegisterCustomer(ctx context.Context, request RegisterCustomerR
 
 	address, err := addressfromOpenAPIToShared(customer.Address)
 	if err != nil {
-		return nil, err
+		return nil, common.NewInvalidInputError("invalid-address", "invalid address: %s", err)
 	}
 
 	customerApp := app.Customer{
