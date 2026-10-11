@@ -178,3 +178,60 @@ Spaced-repetition queue. Answer from memory before checking `<details>`; delete 
 
 6. Given the current workspace state, why would adding `db.NewCustomerRepository(m.pgxDb)` wiring to `module.go` right now not actually fix anything by itself?
    <details><summary>Answer</summary>`handler.go`'s `Handler` struct still only has a `db *pgxpool.Pool` field and no `CustomerRepository` interface field to receive it — there's nothing in the `http` package yet for the repository to be injected into. Wiring the repository into `module.go` without first adding the interface and the field to `Handler` (the "Integrate Repository" work) would just produce a constructed repository with nowhere to go.</details>
+
+
+## Application Layer + Dedicated UUIDs (2026-10-08)
+
+1. Why is `type CustomerUUID struct{ common.UUID }` better than both `type CustomerUUID = common.UUID` and `type CustomerUUID common.UUID`?
+   <details><summary>Answer</summary>The alias is the same type as `common.UUID`, so the compiler treats every UUID as interchangeable and you find the bug at runtime. `type CustomerUUID common.UUID` is distinct but has an empty method set, so it loses `MarshalText`, `UnmarshalText`, `Value`, `Scan`, `String`, `IsZero`. JSON and DB drivers would break unless re-implemented. Embedding in a struct gives a distinct type and promotes all methods.</details>
+
+2. Even with `CustomerUUID` and `RestaurantUUID` as distinct embedded-struct types, name two ways a wrong-ID bug still compiles.
+   <details><summary>Answer</summary>(1) An explicit conversion `RestaurantUUID(customerUUID)`, which should compile because the underlying struct types are identical (verify in a scratch file). (2) Reaching through the promoted field, e.g. `c.Equals(r.UUID)` or passing `r.UUID` to a `common.UUID` parameter. The type system protects against accidental mix-ups, not deliberate unwrapping.</details>
+
+3. What changed about *who imports whom* between guide 10 and now, and what problem from guide 10 did that remove?
+   <details><summary>Answer</summary>Guide 10: `db` imported `http` (for `http.RegisterCustomer`) and the interface lived in `http`. Now both `http` and `db` import `app` and neither imports the other; `app` owns the repository interface. That removed the `db → http` dependency and the duplicated `addressfromOpenAPIToShared`, because the repo receives `app.Customer` with `shared.Address` already mapped.</details>
+
+4. `customer_repo.go:36` calls `queries.InsertCustomer(ctx, args)` and then `return nil`. What does the HTTP client see when the insert fails, and why won't `TestRegisterCustomer` necessarily catch it?
+   <details><summary>Answer</summary>The error is discarded, so the repo returns `nil`, the service returns `nil`, and the handler returns 201 with a UUID that was never persisted. The test only covers the success path: a working DB means the insert succeeds. It would fail only on the follow-up `GetCustomerByUUID` if the row is missing, and only if the failure reproduces in the test.</details>
+
+5. The page's `sqlc.yaml` guidance is a column override for `orders.customers.customer_uuid`. What goes wrong with the committed `db_type: "uuid"` → `app.CustomerUUID` change?
+   <details><summary>Answer</summary>`db_type` applies to every non-null `uuid` column, so the next module's `restaurant_uuid` column would be generated as `app.CustomerUUID`. The nullable override points at `app.NullCustomerUUID`, which doesn't exist, so the first nullable `uuid` column makes `dbmodels` fail to compile. The page says a column override takes precedence over `db_type`, which is why it's the safer shape.</details>
+
+6. With the `ModulesContract` empty today, why must the eventual argument be `m.modules` (a `*contracts.Contracts`) rather than a copy?
+   <details><summary>Answer</summary>`svc.go` creates `&contracts.Contracts{}` and each module fills its own fields in `RegisterContracts`, which runs *after* `Init`. A copy taken in `Init` would hold nil contracts forever; the pointer sees them once registered.</details>
+
+
+## Error Handling — Transport-Agnostic Errors, Slugs, common.Error (2026-10-08)
+
+1. Why must `RegisterCustomer` in `app` return `common.NewInvalidInputError(...)` rather than `echo.NewHTTPError(400, ...)`?
+   <details><summary>Answer</summary>`app` can be called by a gRPC handler, a message consumer or a CLI, none of which have an HTTP response to set. An HTTP error returned from there is meaningless and misleading in logs. `app` says *what* went wrong; each API layer translates to its own protocol.</details>
+
+2. What does the client receive for (a) a `common.Error`, (b) an `*echo.HTTPError` with code 404, (c) `errors.New("pg: connection refused")`?
+   <details><summary>Answer</summary>(a) The error's own status, `PublicError` and `ErrorSlug`, plus `details` if any. `InternalError` is never sent. (b) Status 404, message `Not Found`, slug `not_found`. (c) Status 500, `Internal Server Error`, slug `internal_server_error`. The cause is only in the log line.</details>
+
+3. `errors.As(err, &commonErr)` uses a value-typed `Error`. What happens if a function returns `&common.Error{...}`, and why does it compile?
+   <details><summary>Answer</summary>It compiles because a value-receiver `Error()` is in the pointer's method set, so `*Error` also implements `error`. But `errors.As` with a value target `Error` doesn't match a `*Error`, so the handler falls through to a generic 500 and the slug and status are lost.</details>
+
+4. `err := common.NewInvalidInputError(...).WithInternalError(pgErr)`. Why does `errors.As(err, &pgErr2)` fail, and what are two ways around it?
+   <details><summary>Answer</summary>`common.Error` has no `Unwrap()` method, so `InternalError` isn't part of the error chain. Either inspect/classify the underlying error before wrapping it (decide the `common.Error` kind from it), or add an `Unwrap() error` that returns `InternalError`.</details>
+
+5. `go test ./backend/common/...` passes before you've done anything. Why doesn't that prove errors work end-to-end, and what test would?
+   <details><summary>Answer</summary>The tests call `common.EchoErrorHandler` directly. `NewEcho` in `common/http/echo.go:19` still installs the old `HandleError`, so production behavior is unchanged. A test that builds the server via `NewEcho()` (or hits the real route with `httptest`) and asserts the response slug would fail until the wiring line is changed.</details>
+
+6. A request has `"country_code": "XX"`. Walk the error from `UnmarshalText` to the response body.
+   <details><summary>Answer</summary>`Enum.UnmarshalText` returns a `common.Error` (slug `invalid-enum-value`). The strict handler's `ctx.Bind` returns it; echo's `BindBody` wraps non-`HTTPError` errors in `NewHTTPError(400, err.Error()).SetInternal(err)`. `EchoErrorHandler` finds the `*echo.HTTPError` (status 400), then `errors.As` reaches the `common.Error` through `HTTPError.Unwrap()` and overrides message and slug. The client gets 400 with slug `invalid-enum-value`.</details>
+
+
+## Error Handling — Deep Dive (2026-10-11)
+
+1. Go has no exceptions. What exactly makes Echo call `HTTPErrorHandler`, and where in Echo's source?
+   <details><summary>Answer</summary>`ServeHTTP` runs the middleware chain plus handler as `h(c)`; if it returns a non-nil error, `echo.go:676-677` calls `e.HTTPErrorHandler(err, c)`. The error is an ordinary return value checked once at the top.</details>
+
+2. After `errors.As(err, &httpErr)` succeeds, what happened to the blank `&echo.HTTPError{}` you created on the line before?
+   <details><summary>Answer</summary>Nothing fills it. `errors.As` overwrites the pointer variable `httpErr` so it points at the `*echo.HTTPError` found in the chain; the blank struct is discarded. Verified by running: `same pointer as the blank struct? false`, and `Code` goes from 0 to 404.</details>
+
+3. Why does `Error()` on `common.Error` include `InternalError` while the JSON response doesn't?
+   <details><summary>Answer</summary>An error has two audiences. The log gets the whole struct (operator: slug, internal cause, details); the response is a projection (`HttpErrorResponse`) that omits the cause (client). The handler logs `err` at `errors_echo.go:20` but builds the response from selected fields.</details>
+
+4. A user reports a 500. How do you find the cause, and what is misleading about the request log for that call?
+   <details><summary>Answer</summary>Ask for the `Correlation-ID` response header and grep the logs for it; the `Handling HTTP error` line carries the full error. The "Request done" line is written before the error handler runs, so for failed requests it shows `status=200` and an empty `response_body` (verified by running), so don't trust that field for failures.</details>
